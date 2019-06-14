@@ -138,4 +138,86 @@ private volatile boolean flag;
 
 自旋锁是指尝试获取锁的线程不会立即阻塞，而是采用循环的方式去尝试获取锁，这样的好处是减少线程上下文切换的消耗，缺点是循环会消耗CPU。
 
+## Lock接口的使用和原理  
+
+- **原理**
+
+实现锁需要的条件
+> 一个是表示（锁）状态的变量（我们假设0表示没有线程获取锁，1表示已有线程占有锁）,该变量必须声明为voaltile类型;  
+另一个是队列，队列中的节点表示因未能获取锁而阻塞的线程。  
+
+**线程获取锁的过程**，先读取锁状态的变量，
+if(变量=0) 变量修改为1（通过CAS操作）  
+if(变量=1) 变量修改为0（仅一个线程能成功，其它线程都会失败）  
+若成功，获得锁-->该线程在队列中，则将其出列。如果该线程未入列，则不用对队列进行维护。  
+若失败，则当前线程将自身放入等待（锁的）队列中并阻塞自身，此时线程一直被阻塞在lock方法中，没有从该方法中返回
+> 如果表示状态的变量的值为1，那么将当前线程放入等待队列中，然后将自身阻塞（被唤醒后仍然在lock方法中，并从下一条语句继续执行，这里又会回到第1步重新开始） 
+
+**释放锁的过程**  
+释放锁的线程将状态变量的值从1设置为0，并唤醒等待（锁）队列中的队首节点，释放锁的线程从就从unlock方法中返回，继续执行线程后面的代码  
+1. ReentrantLock  
+
+- 可重入锁  （同步执行，类似synchronized），也叫递归锁，是独享锁，默认是非公平锁。  
+支持重入性，表示能够对共享资源能够重复加锁，即当前线程获取该锁再次获取不会被阻塞。在其线程使用时，其他线程不能获取这把锁。
+
+- 使用
+
+```
+public void get(){
+    private Lock lock = new ReentrantLock();
+    try{
+        lock.lock();
+        do sth ...
+    }catch (InterruptedException e) {
+        e.printStackTrace();
+    } finally {
+        lock.unlock();
+    }
+}
+```
+2. ReentrantReadWriteLock  
+- 可重入读写锁，使用时对写操作独享一把锁，对读操作共享锁，即在写操作时，其他线程不能读写，，但是在读操作时，多个线程可以同时读取，互不影响，使用该锁可以增加并发性。
+- 原理：
+ReentrantReadWriteLock 也是基于AQS实现的，它的自定义同步器（继承AQS）需要在同步状态（一个整型变量state）上维护多个读线程和一个写线程的状态，使得该状态的设计成为读写锁实现的关键。如果在一个整型变量上维护多种状态，就一定需要“按位切割使用”这个变量，读写锁将变量切分成了两个部分，高16位表示读，低16位表示写。
+- 使用
+
+```
+private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+public void read(String key){
+    try {
+        lock.readLock().lock();//加读锁
+        System.out.println(Thread.currentThread().getName()+"\t 正在读取");
+        try {
+            TimeUnit.MILLISECONDS.sleep(300);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        Object value = map.get(key);
+        System.out.println(Thread.currentThread().getName()+"\t 完成读取"+value);
+    }catch (Exception e){
+        e.printStackTrace();
+    }finally {
+        lock.readLock().unlock();//解读锁
+    }
+}
+
+public void write(String key,Object value){
+    try {
+        lock.writeLock().lock();//加写锁
+        System.out.println(Thread.currentThread().getName()+"\t 正在写入 "+key);
+        try {
+            TimeUnit.MILLISECONDS.sleep(300);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        map.put(key,value);
+        System.out.println(Thread.currentThread().getName()+"\t 完成写入");
+    }catch (Exception e){
+        e.printStackTrace();
+    }finally{
+        lock.writeLock().unlock();//解写锁
+    }
+}
+```
 
