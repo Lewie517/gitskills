@@ -24,6 +24,9 @@ public class MyThread implements Runnable{
     }
 }
 ```
+3. 实现Callable接口  
+
+4. 线程池：提供了一个线程队列
 
 - **线程安全：**
 1. 线程安全需要遵守JMM(java内存模型)的规范
