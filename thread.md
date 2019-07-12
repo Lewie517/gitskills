@@ -51,6 +51,24 @@ public class MyThread implements Runnable{
 
 > - **同步语句块**的实现使用的是**monitorenter** 和 **monitorexit** 指令，其中**monitorenter**指令指向同步代码块的开始位置，**monitorexit**指令则指明同步代码块的结束位置，当执行**monitorenter**指令时，当前线程将试图获取 objectref(即对象锁) 所对应的 monitor 的持有权,当 objectref 的 monitor 的进入计数器为 0，那线程可以成功取得 monitor，并将计数器值设置为 1，取锁成功。如果当前线程已经拥有 objectref 的 monitor 的持有权，那它可以重入这个 monitor，重入时计数器的值也会加 1。倘若其他线程已经拥有 objectref 的 monitor 的所有权，那当前线程将被阻塞，直到正在执行线程执行完毕，即monitorexit指令被执行，执行线程将释放monitor(锁)并设置计数器值为0,其他线程将有机会持有 monitor.  
 
+```
+synchronized (this) {
+    System.out.println("...");
+}
+```  
+反汇编后的代码  
+```
+monitorenter    //在同步块开始位置插入monitorenter指令
+getstatic java.lang.System.out : java.io.PrintStream [15]
+ldc <String "..."> [21]
+invokevirtual java.io.PrintStream.println(java.lang.String) : void [23]
+aload_1
+monitorexit    //在同步块结束位置插入
+goto 20
+aload_1
+monitorexit    //在抛出异常位置释放锁
+```
+
 > - **synchronized方法**实现是隐式的，不通过字节码指令来控制的，它实现在方法调用和返回操作之中。JVM可以从方法常量池中的方法表结构中的 **ACC_SYNCHRONIZED** 访问标志区分一个方法是否同步方法。当方法调用时，调用指令将会 检查方法的 **ACC_SYNCHRONIZED** 访问标志是否被设置，如果设置了，执行线程将先持有monitor（管程）， 然后再执行方法，最后再方法完成(无论是正常完成还是非正常完成)时释放monitor。在方法执行期间，执行线程持有了monitor，其他任何线程都无法再获得同一个monitor。如果一个同步方法执行期间抛 出了异常，并且在方法内部无法处理此异常，那这个同步方法所持有的monitor将在异常抛到同步方法之外时自动释放。  
 
 
